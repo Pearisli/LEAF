@@ -110,19 +110,12 @@ def main():
 
     # -------------------- Model --------------------
     # UNet
-    unet = UNetModel(
-        dropout=cfg.model.dropout,
-        num_heads=8,
-        use_scale_shift_norm=True,
-        resblock_updown=True
-    )
-    unet.load_state_dict(torch.load(cfg.model.unet_path, weights_only=True))
-    logging.info(f"Loading pretrained UNet from {cfg.model.unet_path}")
+    unet = UNetModel.from_pretrained(cfg.model.pretrained_path, subfolder="unet")
+    logging.info(f"Loading pretrained UNet from {os.path.join(cfg.model.pretrained_path, 'unet')}")
 
     # VAE
-    vae = AutoencoderKL()
-    vae.load_state_dict(torch.load(cfg.model.vae_path, weights_only=True))
-    logging.info(f"Loading pretrained VAE from {cfg.model.vae_path}")
+    vae = AutoencoderKL.from_pretrained(cfg.model.pretrained_path, subfolder="vae")
+    logging.info(f"Loading pretrained VAE from {os.path.join(cfg.model.pretrained_path, 'vae')}")
 
     # Noise scheduler
     noise_scheduler = DDIMScheduler(

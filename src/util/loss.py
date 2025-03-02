@@ -24,8 +24,3 @@ class LossManager:
         loss = mean_flat(-(z * z_tilde).sum(dim=-1))
         loss /= z.shape[0]
         return loss
-
-    @staticmethod
-    def semantic_loss(mask_output: Tensor, mask_target: Tensor) -> Tensor:
-        return DiceCELoss(sigmoid=True, reduction="mean", include_background=True, lambda_dice=0)(mask_output, mask_target)
-        # return F.binary_cross_entropy_with_logits(mask_output, mask_target)

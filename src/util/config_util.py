@@ -37,7 +37,7 @@ class AcceleratorConfig:
 
     seed: int = 1337
     allow_tf32: bool = True
-    tracker_project_name: str = "rgb2mask"
+    tracker_project_name: str = "leaf"
     output_dir: str = "outputs"
     mixed_precision: str = "no"
     report_to: str = "tensorboard"
@@ -49,8 +49,7 @@ class AcceleratorConfig:
 class ModelConfig:
 
     # diffusion pipeline
-    vae_path: str = "./assets/weights/vae.pth"
-    unet_path: str = "./assets/weights/unet.pth"
+    pretrained_path: str = "./assets"
     init_type: str = "half"
     enable_xformers: bool = True
     use_ema: bool = True
@@ -66,11 +65,6 @@ class ModelConfig:
     reg_repr: bool = True
     reg_lam: float = 1.0
     z_dim: int = 768
-
-    # dice decoder
-    enable_decoder: bool = False
-    pretrained_decoder: bool = False
-    dice_lam: float = 1.0
 
 @dataclass
 class ProjectConfig:

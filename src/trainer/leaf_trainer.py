@@ -37,7 +37,6 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Normalize
 from accelerate import Accelerator
 from tqdm import tqdm
-from PIL import Image
 
 from diffusers import DDIMScheduler
 from diffusers.optimization import get_constant_schedule_with_warmup
@@ -46,7 +45,6 @@ from diffusers.training_utils import EMAModel
 from leaf.pipeline import LeafPipeline, LeafOutput
 from leaf.unet import UNetModel, UNetModelWithReg
 from leaf.encoder import load_repr_encoder
-from leaf.autoencoder import AEDecoder
 from src.util.loss import LossManager
 from src.util.config_util import ProjectConfig
 from src.util.logging_util import eval_dic_to_text, log_dic
@@ -119,8 +117,6 @@ class LeafTrainer:
         self.model.vae.requires_grad_(False)
         self.regunet.requires_grad_(True)
         self.model.latent_encoder.requires_grad_(True)
-        if self.cfg.model.enable_decoder:
-            self.decoder = AEDecoder(out_ch=self.cfg.data.channels)
 
         # Optimizer !should be defined after input layer is adapted
         learning_rate = self.cfg.exp.learning_rate
@@ -203,8 +199,6 @@ class LeafTrainer:
     def _parameters(self, recurse: bool = True):
         params = list(self.regunet.parameters(recurse))
         params += list(self.model.latent_encoder.parameters(recurse))
-        if self.cfg.model.enable_decoder:
-            params += list(self.decoder.parameters(recurse))
         return params
 
     def _prepare_everything(self, device: torch.device, dtype: torch.dtype):
@@ -221,8 +215,6 @@ class LeafTrainer:
         
         if self.cfg.model.reg_repr:
             self.repr_encoder.to(device, dtype)
-        if self.cfg.model.enable_decoder:
-            self.decoder = self.accelerator.prepare(self.decoder)
         
     def _prepare_repr_rgb(self, rgb: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(rgb, 224 * (self.resolution // 256), mode="bicubic")
@@ -350,13 +342,6 @@ class LeafTrainer:
                             z: torch.Tensor = self.repr_encoder.forward_features(x.to(self.dtype))["x_norm_patchtokens"]
                         reg_loss = LossManager.cosine_loss(z.float(), z_tilde.float())
                         loss += self.cfg.model.reg_lam * reg_loss.mean()
-                    
-                    if self.cfg.model.enable_decoder:
-                        decoded_mask = self.decoder.decode(last_hidden_states)
-                        semantic_loss = LossManager.semantic_loss(
-                            decoded_mask, self.gt_to_onehot(mask_gt)
-                        )
-                        loss += self.cfg.model.dice_lam * semantic_loss
 
                     self.train_metrics.update("loss", loss.item())
                     
@@ -531,16 +516,16 @@ class LeafTrainer:
                 _metric = met_func(self.pred_to_onehot(mask_pred), self.gt_to_onehot(mask_gt))
                 metric_tracker.update(_metric_name, _metric.sum().item(), _metric.shape[0])
 
-            # self.image_logger.add_images(rgb.cpu(), self.gt_to_onehot(mask_gt).cpu(), self.pred_to_onehot(mask_pred).cpu())
+            self.image_logger.add_images(rgb.cpu(), self.gt_to_onehot(mask_gt).cpu(), self.pred_to_onehot(mask_pred).cpu())
 
-        # if 0 == self.effective_iter % 2500: # comment for faster training
-        #     np_images = self.image_logger.make_grid()
-        #     self.tracker.writer.add_images(
-        #         f"vis/{prefix}/step{self.effective_iter}",
-        #         np_images,
-        #         self.effective_iter,
-        #         dataformats="HWC"
-        #     )
+        if 0 == self.effective_iter % 2500: # comment for faster training
+            np_images = self.image_logger.make_grid()
+            self.tracker.writer.add_images(
+                f"vis/{prefix}/step{self.effective_iter}",
+                np_images,
+                self.effective_iter,
+                dataformats="HWC"
+            )
         self.image_logger.reset()
 
         return metric_tracker.result()
