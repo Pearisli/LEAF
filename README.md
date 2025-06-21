@@ -1,7 +1,7 @@
 # <img src="assets/images/leaf.png" alt="leaf" style="height:1em; vertical-align:bottom;"/> LEAF: Latent Diffusion with Efficient Encoder Distillation for Aligned Features in Medical Image Segmentation
 
 ## LEAF Framework
-<img src="assets/images/main_pipeline.png" alt="leaf_pipeline" style=" vertical-align:bottom;"/>
+<img src="assets/images/main_pipeline.jpg" alt="leaf_pipeline" style=" vertical-align:bottom;"/>
 
 ## Performance
 <img src="assets/images/performance.png" alt="leaf_performance" style=" vertical-align:bottom;"/>
