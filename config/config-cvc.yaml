@@ -1,0 +1,32 @@
+seed: 1337
+metrics:
+  - dice
+  - miou
+nrow: 6
+output_dir: output
+job_name: CVC-lam-1.0
+
+mixed_precision: bf16
+gradient_accumulation_steps: 1
+pretrained_model_name_or_path: your_pretrained_model_folder
+use_alignment: true
+use_ema: true
+lam: 0.75
+prediction_type: sample
+vision_encoder_model: dinov2_vitb14_reg
+
+learning_rate: 4.0e-5
+weight_decay: 0.01
+
+num_warmup_steps: 10000
+max_train_steps: 100000
+
+base_data_dir: your_data_folder
+dataset_name: CVC
+resolution: 256
+train_batch_size: 4
+test_batch_size: 64
+num_workers: 8
+
+validation_start_steps: 30000
+validation_steps: 200

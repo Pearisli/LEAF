@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 from tqdm.auto import tqdm
 from diffusers import DiffusionPipeline, DDIMScheduler
 from leaf.unet import UNetModel
-from leaf.autoencoder import AutoencoderKL, AEEncoder
+from leaf.autoencoder import AutoencoderKL, LatentEncoder
 
 @dataclass
 class LeafOutput:
@@ -20,9 +20,9 @@ class LeafPipeline(DiffusionPipeline):
         self,
         vae: AutoencoderKL,
         unet: UNetModel,
-        latent_encoder: AEEncoder,
+        latent_encoder: LatentEncoder,
         scheduler: DDIMScheduler,
-        scale_factor: float = 0.18215
+        scaling_factor: float = 0.18215
     ) -> None:
 
         self.register_modules(
@@ -31,22 +31,7 @@ class LeafPipeline(DiffusionPipeline):
             scheduler=scheduler,
             latent_encoder=latent_encoder
         )
-        self.scale_factor = scale_factor
-    
-    def eval(self):
-        self.vae.decoder.eval()
-        self.unet.eval()
-        self.latent_encoder.eval()
-    
-    def encode_rgb(self, rgb_in: torch.Tensor) -> torch.Tensor:
-        rgb_latent = self.latent_encoder.encode(rgb_in).mode()
-        rgb_latent = rgb_latent * self.scale_factor
-        return rgb_latent
-
-    def decode_mask(self, mask_latent: torch.Tensor) -> torch.Tensor:
-        mask_latent = mask_latent / self.scale_factor
-        stacked = self.vae.decode(mask_latent)
-        return stacked
+        self.scaling_factor = scaling_factor
 
     def single_infer(
         self,
@@ -65,7 +50,8 @@ class LeafPipeline(DiffusionPipeline):
         else:
             timesteps = self.scheduler.timesteps
         
-        rgb_latent = self.encode_rgb(rgb_norm)
+        rgb_latent = self.latent_encoder(rgb_norm).mode()
+        rgb_latent = rgb_latent * self.scaling_factor
 
         # Initial depth map (noise)
         mask_latent = torch.randn(
@@ -105,7 +91,8 @@ class LeafPipeline(DiffusionPipeline):
                     model_pred, t, mask_latent, generator=generator
                 ).prev_sample
 
-        mask = self.decode_mask(mask_latent)
+        mask_latent = mask_latent / self.scaling_factor
+        mask = self.vae.decode(mask_latent)
 
         # clip prediction
         mask = torch.clamp(mask, -1.0, 1.0)
@@ -142,4 +129,3 @@ class LeafPipeline(DiffusionPipeline):
             mask_pred=mask_pred,
             mask_np=mask_np
         )
-    

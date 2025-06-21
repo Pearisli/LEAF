@@ -664,26 +664,30 @@ class UNetModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
         sample = self.out(sample)
         return UNet2DConditionOutput(sample=sample)
 
-class UNetModelWithReg(nn.Module):
+class UNetModelWrapper(nn.Module):
 
     def __init__(
         self,
         unet: UNetModel,
-        use_reg: bool = True,
+        use_alignment: bool = True,
         projector_dim: int = 2048,
         z_dim: int = 768,
         **kwargs
     ):
         super().__init__(**kwargs)
         self.unet = unet
-        self.use_reg = use_reg
-        self.projector = nn.Sequential(
-            nn.Linear(self.unet.model_channels, projector_dim),
-            nn.SiLU(),
-            nn.Linear(projector_dim, projector_dim),
-            nn.SiLU(),
-            nn.Linear(projector_dim, z_dim),
-        )
+        self.use_alignment = use_alignment
+        
+        if use_alignment:
+            self.projector = nn.Sequential(
+                nn.Linear(self.unet.model_channels, projector_dim),
+                nn.SiLU(),
+                nn.Linear(projector_dim, projector_dim),
+                nn.SiLU(),
+                nn.Linear(projector_dim, z_dim),
+            )
+        else:
+            self.projector = nn.Identity()
     
     def forward(
         self,
@@ -692,10 +696,10 @@ class UNetModelWithReg(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         
         hidden_states = []
+        z_tilde = None
+
         t_emb = self.unet.timestep_embedding(sample, timestep, self.unet.model_channels, repeat_only=False)
         emb = self.unet.time_embed(t_emb)
-
-        z_tilde = None
 
         # Down block
         for i, module in enumerate(self.unet.input_blocks):
@@ -704,7 +708,7 @@ class UNetModelWithReg(nn.Module):
 
             # representation projection
             bsz, c, h, w = sample.shape
-            if i > 0 and h * w == 256 and z_tilde is None: # skip conv in at layer 0
+            if self.use_alignment and i > 0 and h * w == 256 and z_tilde is None: # skip conv in at layer 0
                 z_tilde = self.projector(sample.view(bsz, c, h * w).transpose(-2, -1)) # (N, 256, C)
 
         # Mid block
@@ -715,7 +719,5 @@ class UNetModelWithReg(nn.Module):
             sample = torch.cat([sample, hidden_states.pop()], dim=1)
             sample = module(sample, emb)
 
-        last_hidden_states = sample.clone()
-
         sample = self.unet.out(sample)
-        return (sample, z_tilde, last_hidden_states)
+        return sample, z_tilde

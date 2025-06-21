@@ -1,7 +1,13 @@
 # <img src="assets/images/leaf.png" alt="leaf" style="height:1em; vertical-align:bottom;"/> LEAF: Latent Diffusion with Efficient Encoder Distillation for Aligned Features in Medical Image Segmentation
 
+## LEAF Framework
+<img src="assets/images/main_pipeline.png" alt="leaf_pipeline" style=" vertical-align:bottom;"/>
+
 ## Performance
-<img src="assets/images/performance.png" alt="leaf" style=" vertical-align:bottom;"/>
+<img src="assets/images/performance.png" alt="leaf_performance" style=" vertical-align:bottom;"/>
+
+## Ablation
+<img src="assets/images/ablation.png" alt="leaf_ablation" style=" vertical-align:bottom;"/>
 
 ## Setup
 
@@ -27,9 +33,7 @@ cd assets
 ```
 
 2. Prepare pre-trained models:
-- Download [U-Net](https://ommer-lab.com/files/latent-diffusion/lsun_churches.zip) and [VAE](https://ommer-lab.com/files/latent-diffusion/kl-f8.zip)
-- Place the downloaded files in the `assets` folder.
-- Extract the weights:
+- Download [U-Net](https://ommer-lab.com/files/latent-diffusion/lsun_churches.zip) and [VAE](https://ommer-lab.com/files/latent-diffusion/kl-f8.zip) and **extract weights**
 ```bash
 unzip kl-f8.zip -d vae
 unzip lsun_churches.zip -d unet
@@ -37,12 +41,7 @@ cd ..
 python extract_weights.py
 ```
 
-3. Generate training configuration:
-```bash
-python src/util/config_util.py --output config.yaml
-```
-
-4. Run training script:
+3. Run training script:
 ```bash
 accelerate launch \
     --num_processes 1 \

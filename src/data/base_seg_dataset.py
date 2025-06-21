@@ -1,11 +1,10 @@
 import os
 import random
-from PIL import Image
-
 import torch
-import torchvision.transforms.functional as F
+from PIL import Image
 from torch.utils.data import Dataset
-from torchvision.transforms import InterpolationMode
+import torchvision.transforms as transforms
+import torchvision.transforms.functional as F
 
 class BaseSegDataset(Dataset):
 
@@ -20,7 +19,6 @@ class BaseSegDataset(Dataset):
         mask_name_mode: str = ".png",
         train_index: int = None,
         valid_index: int = None,
-        scale_transform=lambda x: x / 255.0,
         seed: int = 42
     ):
         super().__init__()
@@ -29,6 +27,25 @@ class BaseSegDataset(Dataset):
             self.dataset_dir
         ), f"Dataset does not exist at: {self.dataset_dir}"
         self.split = split
+
+        # Preprocessing the datasets.
+        image_transforms = transforms.Compose(
+            [
+                transforms.Resize((resolution, resolution)),
+                transforms.ToTensor()
+            ]
+        )
+        mask_transforms = transforms.Compose(
+            [
+                transforms.Resize((resolution, resolution), transforms.InterpolationMode.NEAREST_EXACT),
+                transforms.PILToTensor(),
+                transforms.Lambda(lambda x: torch.where(x > 128, 255.0, 0.0)),
+                transforms.Normalize([0.0], [255.0])
+            ]
+        )
+
+        self.image_transforms = image_transforms
+        self.mask_transforms = mask_transforms
 
         self.rgb_subfolder = rgb_subfolder
         self.mask_subfolder = mask_subfolder
@@ -42,7 +59,6 @@ class BaseSegDataset(Dataset):
 
         self.train_index = train_index
         self.valid_index = valid_index
-        self.scale_transform = scale_transform
         self.seed = seed
 
         # Split data if not specific train/valid partition
@@ -51,23 +67,8 @@ class BaseSegDataset(Dataset):
             base_filenames = self._split_data(base_filenames)
         
         # Load rgb and mask filenames
-        self.rgb_filenames = [os.path.join(dataset_dir, rgb_subfolder, file) + self.rgb_name_mode for file in base_filenames]
+        self.image_filenames = [os.path.join(dataset_dir, rgb_subfolder, file) + self.rgb_name_mode for file in base_filenames]
         self.mask_filenames = [os.path.join(dataset_dir, mask_subfolder, file) + self.mask_name_mode for file in base_filenames]
-
-    def __len__(self):
-        return len(self.rgb_filenames)
-
-    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
-        rgb = self._read_rgb_file(self.rgb_filenames[index])
-        mask = self._read_mask_file(self.mask_filenames[index])
-        mask = self._get_valid_mask(mask)
-        if self.split == "train":
-            rgb, mask = self._shape_aug(rgb, mask)
-        rgb, mask = self.scale_transform(rgb), self.scale_transform(mask) # [0, 255] -> [0, 1]
-        return {
-            "rgb": rgb,
-            "mask": mask
-        }
     
     def _split_data(self, base_filenames: list[str]) -> list[str]:
         random.seed(self.seed)
@@ -78,31 +79,25 @@ class BaseSegDataset(Dataset):
         else:
             return base_filenames[self.valid_index:]
 
-    def _read_rgb_file(self, rgb_path: str, interpolation: InterpolationMode = InterpolationMode.BILINEAR) -> torch.Tensor:
-        rgb = Image.open(rgb_path).convert("RGB")
-        rgb = F.resize(rgb, [self.resolution, self.resolution], interpolation)
-        rgb = F.pil_to_tensor(rgb)
-        return rgb
-
-    def _read_mask_file(self, mask_path: str) -> torch.Tensor:
-        return self._read_rgb_file(mask_path, InterpolationMode.NEAREST_EXACT)
-
-    def _get_valid_mask(self, mask: torch.Tensor) -> torch.Tensor:
-        return torch.where(mask > 128, 255, 0)
-
-    def _shape_aug(self, rgb: torch.Tensor, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _flip(self, rgb: torch.Tensor, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if random.random() > 0.5:
             rgb, mask = F.hflip(rgb), F.hflip(mask)
         if random.random() > 0.5:
             rgb, mask = F.vflip(rgb), F.vflip(mask)
         return rgb, mask
 
-    @classmethod
-    def pred_to_onehot(cls, mask_pred: torch.Tensor) -> torch.Tensor:
-        mask_pred = torch.mean(mask_pred, dim=1, keepdim=True)
-        return torch.where(mask_pred > 0.5, 1.0, 0.0).long()
+    def __len__(self):
+        return len(self.image_filenames)
 
-    @classmethod
-    def gt_to_onehot(cls, mask_gt: torch.Tensor) -> torch.Tensor:
-        mask_gt = torch.mean(mask_gt, dim=1, keepdim=True)
-        return mask_gt.long()
+    def __getitem__(self, index: int):
+        image = Image.open(self.image_filenames[index]).convert("RGB")
+        mask = Image.open(self.mask_filenames[index]).convert("RGB")
+        image = self.image_transforms(image)
+        mask = self.mask_transforms(mask)
+        if self.split == "train":
+            image, mask = self._flip(image, mask)
+
+        return {
+            "pixel_values": image,
+            "mask_values": mask
+        }

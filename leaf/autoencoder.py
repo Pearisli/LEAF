@@ -438,7 +438,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         dec = self.decoder(z)
         return dec
 
-class AEEncoder(ModelMixin, ConfigMixin):
+class LatentEncoder(ModelMixin, ConfigMixin):
 
     @register_to_config
     def __init__(
@@ -475,42 +475,8 @@ class AEEncoder(ModelMixin, ConfigMixin):
         self.encoder.load_state_dict(vae.encoder.state_dict())
         self.quant_conv.load_state_dict(vae.quant_conv.state_dict())
     
-    def encode(self, sample: torch.Tensor) -> DiagonalGaussianDistribution:
+    def forward(self, sample: torch.Tensor) -> DiagonalGaussianDistribution:
         h = self.encoder(sample)
         moments = self.quant_conv(h)
         posterior = DiagonalGaussianDistribution(moments)
         return posterior
-
-class AEDecoder(nn.Module):
-
-    def __init__(
-        self,
-        ch: int = 128,
-        out_ch: int = 3,
-        ch_mult: Tuple = (1, 2, 4, 4),
-        num_res_blocks: int = 2,
-        attn_resolutions: Tuple = (),
-        dropout: float = 0.2,
-        in_channels: int = 3,
-        resolution: int = 256,
-        double_z: bool = True,
-        embed_dim: int = 4,
-    ):
-        super().__init__()
-        self.decoder = Decoder(
-            ch=ch,
-            out_ch=out_ch,
-            ch_mult=ch_mult,
-            num_res_blocks=num_res_blocks,
-            attn_resolutions=attn_resolutions,
-            dropout=dropout,
-            in_channels=in_channels,
-            resolution=resolution,
-            z_channels=192,
-            double_z=double_z
-        )
-        self.embed_dim = embed_dim
-    
-    def decode(self, z: torch.Tensor) -> torch.Tensor:
-        dec = self.decoder(z)
-        return dec
