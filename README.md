@@ -2,7 +2,7 @@
 
 [![Page](https://img.shields.io/badge/Project-Website-pink?logo=googlechrome&logoColor=white)](https://leafseg.github.io/leaf/)
 [![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2507.18214)
-[![Segmentation Model](https://img.shields.io/badge/🤗%20Segmentation-Model-green)](https://huggingface.co/pearisli/LEAF-QaTa-COV19)
+[![HuggingFace Model](https://img.shields.io/badge/🤗%20HuggingFace-Model-green)](https://huggingface.co/pearisli/LEAF-QaTa-COV19)
 
 ## LEAF Framework
 <img src="assets/images/main_pipeline.jpg" alt="leaf_pipeline" style=" vertical-align:bottom;"/>
